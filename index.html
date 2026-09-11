@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Judo Timer">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>Judo Timer</title>
+<style>
+:root{--bg:#0a0a0a;--card:#171717;--line:#333;--text:#fff;--muted:#aaa;--blue:#0a84ff;--red:#ff453a;--orange:#ff9f0a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body,#app{margin:0;width:100%;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif}button{font:inherit;color:inherit}
+.editor{height:100%;overflow:auto;padding:max(14px,env(safe-area-inset-top)) 14px max(18px,env(safe-area-inset-bottom))}
+.top{display:flex;gap:12px;align-items:center}.top h1{font-size:clamp(30px,5vw,46px);margin:0;font-weight:950}.grow{flex:1}.btn{border:1px solid var(--line);background:#222;border-radius:14px;padding:12px 14px;font-weight:900}.btn.primary{background:var(--blue);border-color:var(--blue)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px}.card h3{margin:0 0 10px;color:var(--muted);font-size:13px}
+.sets{display:flex;justify-content:center;align-items:center;gap:14px}.round{width:50px;height:50px;border:0;border-radius:50%;background:#2b2b2b;font-size:28px;font-weight:950}.setnum{width:60px;text-align:center;font-size:38px;font-weight:950}
+.stepper{display:flex;justify-content:center;align-items:center;gap:10px}.unit{display:grid;grid-template-rows:32px 45px 32px 16px;justify-items:center;align-items:center;min-width:70px}.arrow{width:60px;height:32px;border:0;border-radius:10px;background:#2c2c2c;font-size:20px;font-weight:950}.num{font-size:39px;font-weight:950;font-variant-numeric:tabular-nums}.lab{font-size:9px;color:var(--muted);font-weight:900}.colon{font-size:36px;font-weight:950;margin-top:-8px}
+.ph{display:flex;margin:10px 2px 8px;font-size:14px}.ph span{margin-left:auto;color:var(--muted)}
+#rows{display:flex;flex-direction:column;gap:8px}.row{display:grid;grid-template-columns:56px 24px 1fr auto;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:9px}.type{width:54px;height:54px;border:0;border-radius:14px;font-size:24px;font-weight:950}.work{background:var(--red)}.rest{background:var(--blue)}.idx{color:var(--muted);text-align:center;font-weight:800}.acts{display:flex;flex-direction:column;gap:3px}.icon{width:40px;height:30px;border:1px solid var(--line);background:#252525;border-radius:9px;font-weight:950}.danger{color:#ff6961}
+.adds{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin:12px 0}.adds button{min-height:50px}.start{width:100%;min-height:64px;background:var(--blue);border:0;border-radius:18px;font-size:28px;font-weight:950}.status{text-align:center;color:#77dd88;font-size:12px;margin:10px 0}
+.timer{position:fixed;inset:0;background:#000;display:grid;grid-template-rows:auto 1fr auto;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));user-select:none}
+.head{display:flex;justify-content:space-between;font-size:clamp(22px,4vw,40px);font-weight:950}.head.workc{color:var(--red)}.head.restc{color:var(--blue)}.head.breakc{color:var(--orange)}
+.clockwrap{display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden}.clock{font-size:min(45vw,68vh);line-height:.78;font-weight:950;letter-spacing:-.065em;white-space:nowrap;font-variant-numeric:tabular-nums}.clock.warn{color:#ffd60a}
+.foot{min-height:78px;position:relative;display:flex;align-items:flex-end;justify-content:center}.next{position:absolute;left:4px;bottom:6px;color:#bbb;font-weight:700;font-size:clamp(12px,2vw,18px)}.controls{display:flex;gap:10px;transition:.2s}.controls.hide{opacity:0;pointer-events:none}.controls button{height:56px;min-width:88px;border:1px solid #555;background:#1d1d1d;border-radius:15px;font-weight:900}.controls .main{background:var(--blue);border-color:var(--blue)}
+.done{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}.done h1{font-size:clamp(60px,12vw,140px);margin:0}.done p{font-size:clamp(22px,4vw,42px);margin:0;color:#ccc}.done button{margin-top:20px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.adds{grid-template-columns:1fr 1fr}.adds button:last-child{grid-column:1/-1}.row{grid-template-columns:54px 22px 1fr auto}}
+</style>
+</head>
+<body><div id="app"></div>
+<script>
+(()=>{'use strict';
+const KEY='judoTimerPwaV2',app=document.getElementById('app');
+let state=load(),run=null,tickHandle=null,wakeLock=null,controlsTimer=null,audio=null,lastVoice=0;
+function def(){return{sets:4,setBreak:0,items:[{type:'work',seconds:20},{type:'rest',seconds:10}]}}
+function clamp(v,a,b){return Math.min(b,Math.max(a,v))}
+function load(){try{const x=JSON.parse(localStorage.getItem(KEY));if(!x||!Array.isArray(x.items)||!x.items.length)return def();return{sets:clamp(+x.sets||1,1,30),setBreak:clamp(+x.setBreak||0,0,5999),items:x.items.map(i=>({type:i.type==='rest'?'rest':'work',seconds:clamp(+i.seconds||0,0,5999)}))}}catch{return def()}}
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+function fmt(s){s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+function total(){const one=state.items.reduce((a,b)=>a+b.seconds,0);return one*state.sets+state.setBreak*Math.max(0,state.sets-1)}
+function stepHTML(sec,key){return '<div class="stepper" data-key="'+key+'"><div class="unit"><button class="arrow" data-d="60">▲</button><div class="num">'+Math.floor(sec/60)+'</div><button class="arrow" data-d="-60">▼</button><div class="lab">MIN</div></div><div class="colon">:</div><div class="unit"><button class="arrow" data-d="5">▲</button><div class="num">'+String(sec%60).padStart(2,'0')+'</div><button class="arrow" data-d="-5">▼</button><div class="lab">SEC</div></div></div>'}
+function rowHTML(it,i){return '<div class="row" data-i="'+i+'"><button class="type '+it.type+'" data-a="toggle">'+(it.type==='work'?'W':'R')+'</button><div class="idx">'+(i+1)+'</div>'+stepHTML(it.seconds,'i:'+i)+'<div class="acts"><button class="icon" data-a="up">↑</button><button class="icon" data-a="copy">⧉</button><button class="icon" data-a="down">↓</button><button class="icon danger" data-a="del">×</button></div></div>'}
+function renderEditor(){app.innerHTML='<main class="editor"><div class="top"><div><h1>JUDO TIMER</h1><div style="color:#aaa;font-size:13px;margin-top:5px">5-sec control · offline</div></div><div class="grow"></div><button class="btn" id="test">TEST BEEP</button></div><div class="grid"><section class="card"><h3>SETS</h3><div class="sets"><button class="round" id="sd">−</button><div class="setnum">'+state.sets+'</div><button class="round" id="su">＋</button></div><div style="text-align:center;margin-top:8px;color:#aaa">Total '+fmt(total())+'</div></section><section class="card"><h3>SET BREAK</h3>'+stepHTML(state.setBreak,'break')+'</section></div><div class="ph"><strong>PROGRAM</strong><span>'+state.items.length+' steps</span></div><section id="rows">'+state.items.map(rowHTML).join('')+'</section><div class="adds"><button class="btn" id="aw">＋ WORK</button><button class="btn" id="ar">＋ REST</button><button class="btn" id="cp">⧉ COPY LAST 2</button></div><button class="start" id="start">START</button><div class="status" id="status">Checking offline…</div></main>';bindEditor();offlineStatus()}
+function repeat(btn,fn){let a,b;const start=e=>{e.preventDefault();fn();a=setTimeout(()=>b=setInterval(fn,110),420)},end=()=>{clearTimeout(a);clearInterval(b)};btn.addEventListener('pointerdown',start);['pointerup','pointercancel','pointerleave'].forEach(x=>btn.addEventListener(x,end))}
+function adjust(key,d){if(key==='break')state.setBreak=clamp(state.setBreak+d,0,5999);else{const i=+key.split(':')[1];if(state.items[i])state.items[i].seconds=clamp(state.items[i].seconds+d,0,5999)}save();renderEditor()}
+function bindEditor(){document.getElementById('test').onclick=()=>{ensureAudio();beep()};document.getElementById('sd').onclick=()=>{state.sets=clamp(state.sets-1,1,30);save();renderEditor()};document.getElementById('su').onclick=()=>{state.sets=clamp(state.sets+1,1,30);save();renderEditor()};document.getElementById('aw').onclick=()=>add('work');document.getElementById('ar').onclick=()=>add('rest');document.getElementById('cp').onclick=copy2;document.getElementById('start').onclick=startProgram;document.querySelectorAll('.stepper').forEach(s=>s.querySelectorAll('button').forEach(b=>repeat(b,()=>adjust(s.dataset.key,+b.dataset.d))));document.querySelectorAll('.row').forEach(r=>r.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>rowAction(+r.dataset.i,b.dataset.a)))}
+function add(type){const p=[...state.items].reverse().find(x=>x.type===type);state.items.push({type,seconds:p?p.seconds:(type==='work'?20:10)});save();renderEditor()}
+function copy2(){if(state.items.length<2)return;state.items.push({...state.items.at(-2)},{...state.items.at(-1)});save();renderEditor()}
+function rowAction(i,a){if(!state.items[i])return;if(a==='toggle')state.items[i].type=state.items[i].type==='work'?'rest':'work';if(a==='copy')state.items.splice(i+1,0,{...state.items[i]});if(a==='del'&&state.items.length>1)state.items.splice(i,1);if(a==='up'&&i>0)[state.items[i-1],state.items[i]]=[state.items[i],state.items[i-1]];if(a==='down'&&i<state.items.length-1)[state.items[i+1],state.items[i]]=[state.items[i],state.items[i+1]];save();renderEditor()}
+function ensureAudio(){if(!audio){const C=window.AudioContext||window.webkitAudioContext;audio=new C()}if(audio.state==='suspended')audio.resume().catch(()=>{})}
+function tone(freq,dur,delay=0){ensureAudio();const o=audio.createOscillator(),g=audio.createGain(),t=audio.currentTime+delay;o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.95,t+.01);g.gain.setValueAtTime(.95,t+Math.max(.02,dur-.02));g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(audio.destination);o.start(t);o.stop(t+dur+.02)}
+function beep(){tone(1650,.72)}
+function finishBeep(){tone(1550,.18,0);tone(1550,.18,.28);tone(1750,.9,.56)}
+function speak(n){if(n===lastVoice)return;lastVoice=n;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(n===3?'Three':n===2?'Two':'One');u.lang='en-US';u.rate=.92;u.volume=1;speechSynthesis.speak(u)}catch{}}
+function build(){const arr=[],valid=state.items.filter(x=>x.seconds>0);for(let s=1;s<=state.sets;s++){valid.forEach((x,i)=>arr.push({kind:x.type,dur:x.seconds,set:s,step:i+1}));if(s<state.sets&&state.setBreak>0)arr.push({kind:'break',dur:state.setBreak,set:s,step:null})}return arr}
+function startProgram(){const seg=build();if(!seg.length)return;ensureAudio();requestWake();run={seg,i:0,running:true,remain:seg[0].dur,end:performance.now()+seg[0].dur*1000,controls:true};lastVoice=0;renderTimer();startTick();hideLater()}
+function cur(){return run&&run.seg[run.i]}
+function nextText(){const n=run.seg[run.i+1];if(!n)return'FINAL';return 'NEXT  '+(n.kind==='break'?'SET BREAK':n.kind.toUpperCase())+'  '+fmt(n.dur)}
+function renderTimer(){const s=cur();if(!s){renderDone();return}const hc=s.kind==='work'?'workc':s.kind==='rest'?'restc':'breakc';app.innerHTML='<main class="timer" id="ts"><div class="head '+hc+'"><span>'+(s.kind==='break'?'SET BREAK':s.kind.toUpperCase())+'</span><span>SET '+s.set+' / '+state.sets+'</span></div><div class="clockwrap"><div class="clock" id="clock">'+fmt(run.remain)+'</div></div><div class="foot"><div class="next">'+nextText()+'</div><div class="controls '+(run.controls?'':'hide')+'" id="controls"><button class="main" id="pause">'+(run.running?'PAUSE':'RESUME')+'</button><button id="next">NEXT</button><button id="edit">EDIT</button></div></div></main>';document.getElementById('ts').onclick=e=>{if(e.target.closest('button'))return;run.controls=!run.controls;updateControls();if(run.controls)hideLater()};document.getElementById('pause').onclick=togglePause;document.getElementById('next').onclick=advance;document.getElementById('edit').onclick=()=>{stopRun();renderEditor()};fitClock()}
+function fitClock(){requestAnimationFrame(()=>{const c=document.getElementById('clock'),w=document.querySelector('.clockwrap');if(!c||!w)return;let z=Math.min(w.clientHeight*.93,w.clientWidth*.49);c.style.fontSize=z+'px';for(let i=0;i<25&&(c.scrollWidth>w.clientWidth*.99||c.scrollHeight>w.clientHeight*.99);i++){z*=.94;c.style.fontSize=z+'px'}})}
+window.addEventListener('resize',fitClock);
+function startTick(){stopTick();tickHandle=setInterval(tick,100)}
+function stopTick(){if(tickHandle){clearInterval(tickHandle);tickHandle=null}}
+function tick(){if(!run||!run.running)return;const rem=Math.max(0,(run.end-performance.now())/1000),show=Math.ceil(rem-.01);if(show!==run.remain){run.remain=show;const c=document.getElementById('clock');if(c){c.textContent=fmt(show);c.classList.toggle('warn',show<=3&&show>0)}}const n=Math.ceil(rem);if(n<=3&&n>=1)speak(n);if(rem<=.02)advance()}
+function advance(){if(!run)return;if(run.i>=run.seg.length-1){finishBeep();stopTick();releaseWake();run=null;renderDone();return}beep();run.i++;run.remain=cur().dur;run.end=performance.now()+cur().dur*1000;run.running=true;lastVoice=0;renderTimer();hideLater()}
+function togglePause(){if(run.running){run.remain=Math.max(0,(run.end-performance.now())/1000);run.running=false}else{run.end=performance.now()+run.remain*1000;run.running=true}renderTimer();hideLater()}
+function updateControls(){const c=document.getElementById('controls');if(c)c.classList.toggle('hide',!run.controls)}
+function hideLater(){clearTimeout(controlsTimer);controlsTimer=setTimeout(()=>{if(run){run.controls=false;updateControls()}},3200)}
+function stopRun(){stopTick();run=null;lastVoice=0;releaseWake()}
+function renderDone(){app.innerHTML='<section class="done"><h1>FINISHED</h1><p>'+state.sets+' SETS COMPLETE</p><button class="btn primary" id="back">BACK TO PROGRAM</button></section>';document.getElementById('back').onclick=renderEditor}
+async function requestWake(){try{if('wakeLock'in navigator)wakeLock=await navigator.wakeLock.request('screen')}catch{}}
+async function releaseWake(){try{if(wakeLock){await wakeLock.release();wakeLock=null}}catch{}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&run?.running)requestWake()});
+async function offlineStatus(){const e=document.getElementById('status');if(!e)return;if(!('serviceWorker'in navigator)){e.textContent='Offline mode unavailable';return}try{await navigator.serviceWorker.ready;e.textContent='✓ Offline ready · Add to Home Screen'}catch{e.textContent='Open once online to enable offline mode'}}
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+renderEditor();
+})();
+</script></body></html>
