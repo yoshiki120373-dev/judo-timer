@@ -1,5 +1,5 @@
-const CACHE='judo-timer-v7';
-const CORE=['./manifest.webmanifest','./icon.svg','./audio/three.mp3','./audio/two.mp3','./audio/one.mp3'];
+const CACHE='judo-timer-v8';
+const CORE=['./manifest.webmanifest','./icon.svg','./audio/three.mp3?v=8','./audio/two.mp3?v=8','./audio/one.mp3?v=8'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim()});
 self.addEventListener('fetch',e=>{
