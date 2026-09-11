@@ -34,7 +34,7 @@
 const KEY='judoTimerPwaV2',app=document.getElementById('app');
 let state=load(),run=null,tickHandle=null,wakeLock=null,controlsTimer=null,audio=null,lastVoice=0;
 const voiceBytes={},voiceBuffers={};
-[[3,'three'],[2,'two'],[1,'one']].forEach(([n,name])=>fetch('./audio/'+name+'.mp3').then(r=>r.arrayBuffer()).then(b=>voiceBytes[n]=b).catch(()=>{}));
+[[3,'three'],[2,'two'],[1,'one']].forEach(([n,name])=>fetch('./audio/'+name+'.mp3?v=8').then(r=>r.arrayBuffer()).then(b=>voiceBytes[n]=b).catch(()=>{}));
 function def(){return{sets:4,setBreak:0,items:[{type:'work',seconds:20},{type:'rest',seconds:10}]}}
 function clamp(v,a,b){return Math.min(b,Math.max(a,v))}
 function load(){try{const x=JSON.parse(localStorage.getItem(KEY));if(!x||!Array.isArray(x.items)||!x.items.length)return def();return{sets:clamp(+x.sets||1,1,30),setBreak:clamp(+x.setBreak||0,0,5999),items:x.items.map(i=>({type:i.type==='rest'?'rest':'work',seconds:clamp(+i.seconds||0,0,5999)}))}}catch{return def()}}
@@ -76,7 +76,7 @@ async function requestWake(){try{if('wakeLock'in navigator)wakeLock=await naviga
 async function releaseWake(){try{if(wakeLock){await wakeLock.release();wakeLock=null}}catch{}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&run?.running)requestWake()});
 async function offlineStatus(){const e=document.getElementById('status');if(!e)return;if(!('serviceWorker'in navigator)){e.textContent='Offline mode unavailable';return}try{await navigator.serviceWorker.ready;e.textContent='✓ Offline ready · Add to Home Screen'}catch{e.textContent='Open once online to enable offline mode'}}
-if('serviceWorker'in navigator)window.addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=7');await reg.update()}catch{}});
+if('serviceWorker'in navigator)window.addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=8');await reg.update()}catch{}});
 renderEditor();
 })();
 </script></body></html>
