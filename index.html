@@ -73,7 +73,7 @@ async function requestWake(){try{if('wakeLock'in navigator)wakeLock=await naviga
 async function releaseWake(){try{if(wakeLock){await wakeLock.release();wakeLock=null}}catch{}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&run?.running)requestWake()});
 async function offlineStatus(){const e=document.getElementById('status');if(!e)return;if(!('serviceWorker'in navigator)){e.textContent='Offline mode unavailable';return}try{await navigator.serviceWorker.ready;e.textContent='✓ Offline ready · Add to Home Screen'}catch{e.textContent='Open once online to enable offline mode'}}
-if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+if('serviceWorker'in navigator)window.addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=4');await reg.update()}catch{}});
 renderEditor();
 })();
 </script></body></html>
