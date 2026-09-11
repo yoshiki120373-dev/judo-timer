@@ -32,7 +32,7 @@
 <script>
 (()=>{'use strict';
 const KEY='judoTimerPwaV2',app=document.getElementById('app');
-let state=load(),run=null,tickHandle=null,wakeLock=null,controlsTimer=null,audio=null,lastVoice=0;
+let state=load(),run=null,tickHandle=null,wakeLock=null,controlsTimer=null,audio=null,lastVoice=0;\nconst voiceBytes={},voiceBuffers={};\n[[3,'three'],[2,'two'],[1,'one']].forEach(([n,name])=>fetch('./audio/'+name+'.mp3').then(r=>r.arrayBuffer()).then(b=>voiceBytes[n]=b).catch(()=>{}));
 function def(){return{sets:4,setBreak:0,items:[{type:'work',seconds:20},{type:'rest',seconds:10}]}}
 function clamp(v,a,b){return Math.min(b,Math.max(a,v))}
 function load(){try{const x=JSON.parse(localStorage.getItem(KEY));if(!x||!Array.isArray(x.items)||!x.items.length)return def();return{sets:clamp(+x.sets||1,1,30),setBreak:clamp(+x.setBreak||0,0,5999),items:x.items.map(i=>({type:i.type==='rest'?'rest':'work',seconds:clamp(+i.seconds||0,0,5999)}))}}catch{return def()}}
@@ -49,12 +49,13 @@ function add(type){const p=[...state.items].reverse().find(x=>x.type===type);sta
 function copy2(){if(state.items.length<2)return;state.items.push({...state.items.at(-2)},{...state.items.at(-1)});save();renderEditor()}
 function rowAction(i,a){if(!state.items[i])return;if(a==='toggle')state.items[i].type=state.items[i].type==='work'?'rest':'work';if(a==='copy')state.items.splice(i+1,0,{...state.items[i]});if(a==='del'&&state.items.length>1)state.items.splice(i,1);if(a==='up'&&i>0)[state.items[i-1],state.items[i]]=[state.items[i],state.items[i-1]];if(a==='down'&&i<state.items.length-1)[state.items[i+1],state.items[i]]=[state.items[i],state.items[i+1]];save();renderEditor()}
 function ensureAudio(){if(!audio){const C=window.AudioContext||window.webkitAudioContext;audio=new C()}if(audio.state==='suspended')audio.resume().catch(()=>{})}
-function tone(freq,dur,delay=0){ensureAudio();const o=audio.createOscillator(),g=audio.createGain(),t=audio.currentTime+delay;o.type='sine';o.frequency.value=freq;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.95,t+.01);g.gain.setValueAtTime(.95,t+Math.max(.02,dur-.02));g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(audio.destination);o.start(t);o.stop(t+dur+.02)}
-function beep(){tone(1650,.72)}
-function finishBeep(){tone(1550,.18,0);tone(1550,.18,.28);tone(1750,.9,.56)}
-function speak(n){if(n===lastVoice)return;lastVoice=n;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(n===3?'Three':n===2?'Two':'One');u.lang='en-US';u.rate=.92;u.volume=1;speechSynthesis.speak(u)}catch{}}
+async function prepareVoiceBuffers(){ensureAudio();for(const n of [3,2,1]){if(!voiceBuffers[n]&&voiceBytes[n]){try{voiceBuffers[n]=await audio.decodeAudioData(voiceBytes[n].slice(0))}catch{}}}}
+function tone(freq,dur,delay=0){ensureAudio();const o=audio.createOscillator(),g=audio.createGain(),comp=audio.createDynamicsCompressor(),t=audio.currentTime+delay;o.type='sine';o.frequency.value=freq;comp.threshold.value=-10;comp.knee.value=0;comp.ratio.value=20;comp.attack.value=.002;comp.release.value=.08;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(1.35,t+.008);g.gain.setValueAtTime(1.35,t+Math.max(.02,dur-.018));g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(comp).connect(audio.destination);o.start(t);o.stop(t+dur+.02)}
+function beep(){tone(1950,.90)}
+function finishBeep(){tone(1800,.18,0);tone(1800,.18,.28);tone(2050,1.05,.56)}
+function speak(n){if(n===lastVoice)return;lastVoice=n;ensureAudio();const b=voiceBuffers[n];if(b){const src=audio.createBufferSource(),g=audio.createGain();src.buffer=b;g.gain.value=1.25;src.connect(g).connect(audio.destination);src.start();return}try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(n===3?'Three':n===2?'Two':'One');u.lang='en-US';u.rate=.9;u.volume=1;speechSynthesis.speak(u)}catch{}}
 function build(){const arr=[],valid=state.items.filter(x=>x.seconds>0);for(let s=1;s<=state.sets;s++){valid.forEach((x,i)=>arr.push({kind:x.type,dur:x.seconds,set:s,step:i+1}));if(s<state.sets&&state.setBreak>0)arr.push({kind:'break',dur:state.setBreak,set:s,step:null})}return arr}
-function startProgram(){const seg=build();if(!seg.length)return;ensureAudio();requestWake();run={seg,i:0,running:true,remain:seg[0].dur,end:performance.now()+seg[0].dur*1000,controls:true};lastVoice=0;renderTimer();startTick();hideLater()}
+function startProgram(){const seg=build();if(!seg.length)return;ensureAudio();prepareVoiceBuffers();requestWake();run={seg,i:0,running:true,remain:seg[0].dur,end:performance.now()+seg[0].dur*1000,controls:true};lastVoice=0;renderTimer();startTick();hideLater()}
 function cur(){return run&&run.seg[run.i]}
 function nextText(){const n=run.seg[run.i+1];if(!n)return'FINAL';return 'NEXT  '+(n.kind==='break'?'SET BREAK':n.kind.toUpperCase())+'  '+fmt(n.dur)}
 function renderTimer(){const s=cur();if(!s){renderDone();return}const hc=s.kind==='work'?'workc':s.kind==='rest'?'restc':'breakc';app.innerHTML='<main class="timer" id="ts"><div class="head '+hc+'"><span>'+(s.kind==='break'?'SET BREAK':s.kind.toUpperCase())+'</span><span>SET '+s.set+' / '+state.sets+'</span></div><div class="clockwrap"><div class="clock" id="clock">'+fmt(run.remain)+'</div></div><div class="foot"><div class="next">'+nextText()+'</div><div class="controls '+(run.controls?'':'hide')+'" id="controls"><button class="main" id="pause">'+(run.running?'PAUSE':'RESUME')+'</button><button id="next">NEXT</button><button id="edit">EDIT</button></div></div></main>';document.getElementById('ts').onclick=e=>{if(e.target.closest('button'))return;run.controls=!run.controls;updateControls();if(run.controls)hideLater()};document.getElementById('pause').onclick=togglePause;document.getElementById('next').onclick=advance;document.getElementById('edit').onclick=()=>{stopRun();renderEditor()};fitClock()}
@@ -73,7 +74,7 @@ async function requestWake(){try{if('wakeLock'in navigator)wakeLock=await naviga
 async function releaseWake(){try{if(wakeLock){await wakeLock.release();wakeLock=null}}catch{}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&run?.running)requestWake()});
 async function offlineStatus(){const e=document.getElementById('status');if(!e)return;if(!('serviceWorker'in navigator)){e.textContent='Offline mode unavailable';return}try{await navigator.serviceWorker.ready;e.textContent='✓ Offline ready · Add to Home Screen'}catch{e.textContent='Open once online to enable offline mode'}}
-if('serviceWorker'in navigator)window.addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=4');await reg.update()}catch{}});
+if('serviceWorker'in navigator)window.addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./sw.js?v=5');await reg.update()}catch{}});
 renderEditor();
 })();
 </script></body></html>
